@@ -1,0 +1,167 @@
+.tela {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100dvh;
+}
+.painel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  padding: 64px;
+  background: var(--gradiente);
+  color: #fff;
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 24px;
+  font-weight: 600;
+}
+.logoIcone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 20%);
+}
+.frase {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.texto {
+  font-size: 16px;
+  font-weight: 500;
+  opacity: 0.92;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  list-style: none;
+}
+.chips li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 104px;
+  padding: 12px 10px;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 14%);
+}
+.chips strong {
+  font-size: 18px;
+}
+.chips span {
+  font-size: 12px;
+  opacity: 0.9;
+}
+.lado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+.logoCelular {
+  display: none;
+}
+.caixa {
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Formulários */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.google {
+  width: 100%;
+  height: 48px;
+}
+.ou {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--texto-secundario);
+  font-size: 12px;
+}
+.ou::before,
+.ou::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--borda);
+}
+.entradaIcone {
+  position: relative;
+}
+.entradaIcone > svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--texto-secundario);
+  pointer-events: none;
+}
+.entradaIcone input {
+  padding-left: 42px;
+}
+.olho {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+}
+.linkDireita {
+  align-self: flex-end;
+  margin-top: -8px;
+  color: var(--roxo);
+  font-size: 13px;
+  font-weight: 600;
+}
+.enviar {
+  width: 100%;
+  height: 48px;
+}
+.rodape {
+  text-align: center;
+  color: var(--texto-secundario);
+}
+.rodape a {
+  color: var(--roxo);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .tela {
+    grid-template-columns: 1fr;
+  }
+  .painel {
+    display: none;
+  }
+  .lado {
+    justify-content: flex-start;
+    gap: 40px;
+    padding: 32px 20px;
+  }
+  .logoCelular {
+    display: block;
+    align-self: flex-start;
+  }
+}

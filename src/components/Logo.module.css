@@ -1,0 +1,18 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--gradiente);
+  color: #fff;
+  flex-shrink: 0;
+}
+.nome {
+  font-size: 16px;
+  font-weight: 600;
+}
