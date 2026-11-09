@@ -2,6 +2,7 @@
 
 import {
   BookOpen,
+  Check,
   Clock,
   Info,
   Lock,
@@ -16,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { formatarMinutos } from "@/lib/datas";
 import { limiteRevisoesDia, type Tema } from "@/lib/revisoes";
 import { aplicarTema } from "@/lib/tema";
@@ -31,7 +32,49 @@ const TEMAS: { id: Tema; nome: string; icone: typeof Sun }[] = [
   { id: "automatico", nome: "Automático", icone: Monitor },
 ];
 
+type Ajustes = { horas: number; minutos: number; tema: Tema };
+
 export default function Configuracoes() {
+  const { config, mostrarAviso } = useApp();
+  // "salvo" é o que está na conta; "ajustes" é o que está na tela
+  const [salvo, setSalvo] = useState<Ajustes>({
+    horas: config.horas_estudo_dia,
+    minutos: config.minutos_por_revisao,
+    tema: config.tema,
+  });
+  const [ajustes, setAjustes] = useState<Ajustes>(salvo);
+  const [salvando, iniciar] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+  const mudou = ajustes.horas !== salvo.horas || ajustes.minutos !== salvo.minutos || ajustes.tema !== salvo.tema;
+
+  // Se sair sem salvar, o tema volta ao que está salvo
+  const temaSalvo = useRef(salvo.tema);
+  useEffect(() => {
+    temaSalvo.current = salvo.tema;
+  }, [salvo.tema]);
+  useEffect(() => () => aplicarTema(temaSalvo.current), []);
+
+  function salvar() {
+    setErro(null);
+    const novo = ajustes;
+    iniciar(async () => {
+      try {
+        if (novo.horas !== salvo.horas || novo.minutos !== salvo.minutos) {
+          const r = await salvarTempo(novo.horas, novo.minutos);
+          if (!r.ok) return setErro(r.erro);
+        }
+        if (novo.tema !== salvo.tema) {
+          const r = await salvarTema(novo.tema);
+          if (!r.ok) return setErro(r.erro);
+        }
+        setSalvo(novo);
+        mostrarAviso("Configurações salvas!");
+      } catch {
+        setErro("Não foi possível salvar. Confira a internet e tente de novo.");
+      }
+    });
+  }
+
   return (
     <main className={styles.pagina}>
       <title>Configurações · Concurso Plus</title>
@@ -42,13 +85,31 @@ export default function Configuracoes() {
         </div>
         <div className={styles.configGrade}>
           <div className={styles.configColuna}>
-            <CartaoTempo />
-            <CartaoTema />
+            <CartaoTempo
+              horas={ajustes.horas}
+              minutos={ajustes.minutos}
+              aoMudar={(horas, minutos) => setAjustes((a) => ({ ...a, horas, minutos }))}
+            />
+            <CartaoTema tema={ajustes.tema} aoMudar={(tema) => setAjustes((a) => ({ ...a, tema }))} />
           </div>
           <div className={styles.configColuna}>
             <CartaoDisciplinas />
             <CartaoConta />
           </div>
+        </div>
+        <div className={`cartao ${styles.barraSalvar}`}>
+          {erro ? (
+            <span className="erro" role="alert">
+              {erro}
+            </span>
+          ) : (
+            <span className="legenda secundario">
+              {mudou ? "Você tem alterações que ainda não foram salvas." : "Tempo de estudo e aparência estão salvos."}
+            </span>
+          )}
+          <button type="button" className="botao botao-primario" onClick={salvar} disabled={!mudou || salvando}>
+            <Check size={18} /> {salvando ? "Salvando…" : "Salvar alterações"}
+          </button>
         </div>
       </section>
     </main>
@@ -109,21 +170,17 @@ function Contador({
   );
 }
 
-function CartaoTempo() {
-  const { config, mostrarAviso } = useApp();
-  const [horas, setHoras] = useState(config.horas_estudo_dia);
-  const [minutos, setMinutos] = useState(config.minutos_por_revisao);
-  const [, iniciar] = useTransition();
+function CartaoTempo({
+  horas,
+  minutos,
+  aoMudar,
+}: {
+  horas: number;
+  minutos: number;
+  aoMudar: (horas: number, minutos: number) => void;
+}) {
   const limite = limiteRevisoesDia({ horas_estudo_dia: horas, minutos_por_revisao: minutos });
-
-  function salvar(h: number, m: number) {
-    setHoras(h);
-    setMinutos(m);
-    iniciar(async () => {
-      const r = await salvarTempo(h, m);
-      if (!r.ok) mostrarAviso(r.erro);
-    });
-  }
+  const salvar = aoMudar;
 
   return (
     <div className={`cartao ${styles.configCartao}`}>
@@ -168,9 +225,7 @@ function CartaoTempo() {
   );
 }
 
-function CartaoTema() {
-  const { config } = useApp();
-  const [tema, setTema] = useState<Tema>(config.tema);
+function CartaoTema({ tema, aoMudar }: { tema: Tema; aoMudar: (tema: Tema) => void }) {
   return (
     <div className={`cartao ${styles.configCartao}`}>
       <Cabecalho icone={Palette} titulo="Aparência" texto="Escolha o tema do site" cor={styles.iconeAviso} />
@@ -183,9 +238,8 @@ function CartaoTema() {
             aria-checked={tema === id}
             className={tema === id ? styles.temaAtivo : styles.tema}
             onClick={() => {
-              setTema(id);
-              aplicarTema(id);
-              void salvarTema(id);
+              aoMudar(id);
+              aplicarTema(id); // mostra o tema na hora; só fica salvo ao clicar em Salvar
             }}
           >
             <Icone size={20} />

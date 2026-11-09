@@ -5,15 +5,31 @@ import {
   CalendarDays,
   Check,
   CircleAlert,
+  Coffee,
   Flame,
+  Minus,
   Pencil,
+  Play,
   Plus,
+  Square,
+  Timer,
   Trash2,
   X,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { SeletorData } from "@/components/SeletorData";
 import { dataCurta, diaMes, diaSemanaCurto, formatarMinutos } from "@/lib/datas";
+import {
+  FOCO_MAX,
+  FOCO_MIN,
+  formatarRelogio,
+  guardarTempos,
+  lerTempos,
+  PAUSA_MAX,
+  PAUSA_MIN,
+  useAgora,
+} from "@/lib/pomodoro";
 import { cargaDoDia, datasRevisoes, type Conteudo } from "@/lib/revisoes";
 import { adicionarDisciplina, excluirConteudo, responderDificil, salvarConteudo } from "./acoes";
 import { useApp } from "./Contexto";
@@ -66,9 +82,32 @@ export function Janelas() {
       return <JanelaExcluir conteudo={janela.conteudo} aoFechar={fechar} />;
     case "dificil":
       return <JanelaDificil revisaoId={janela.revisao.id} numero={janela.revisao.numero} conteudo={janela.conteudo} aoFechar={fechar} />;
-    case "anotacoes":
-      return <JanelaAnotacoes conteudo={janela.conteudo} numero={janela.revisao.numero} aoFechar={fechar} />;
+    case "revisao":
+      return <JanelaRevisao revisaoId={janela.revisao.id} conteudo={janela.conteudo} aoFechar={fechar} />;
+    case "pomodoroFim":
+      return <JanelaPomodoroFim revisaoId={janela.revisao.id} conteudo={janela.conteudo} aoFechar={fechar} />;
   }
+}
+
+/** Fica de olho no relógio e avisa quando o tempo da fase acaba. */
+export function MonitorPomodoro() {
+  const { pomodoro, pararPomodoro, todasRevisoes } = useApp();
+  const existe = pomodoro ? todasRevisoes.some((r) => r.id === pomodoro.revisaoId) : true;
+
+  useEffect(() => {
+    if (!existe) pararPomodoro(); // o conteúdo foi excluído
+  }, [existe, pararPomodoro]);
+
+  return pomodoro && !pomodoro.terminou && existe ? <VigiaDoTempo fimEm={pomodoro.fimEm} /> : null;
+}
+
+function VigiaDoTempo({ fimEm }: { fimEm: number }) {
+  const { fimDaFasePomodoro } = useApp();
+  const acabou = useAgora() >= fimEm;
+  useEffect(() => {
+    if (acabou) fimDaFasePomodoro();
+  }, [acabou, fimDaFasePomodoro]);
+  return null;
 }
 
 function JanelaConteudo({ conteudo, aoFechar }: { conteudo?: Conteudo; aoFechar: () => void }) {
@@ -82,7 +121,7 @@ function JanelaConteudo({ conteudo, aoFechar }: { conteudo?: Conteudo; aoFechar:
   const [erro, setErro] = useState<string | null>(null);
   const [mostrarLimite, setMostrarLimite] = useState(false);
   const [salvando, iniciar] = useTransition();
-  const dataRef = useRef<HTMLInputElement>(null);
+  const dataRef = useRef<HTMLButtonElement>(null);
 
   const datas = data && data <= hoje ? datasRevisoes(data) : [];
   // Carga de cada dia das novas revisões (a 1ª não conta; datas passadas caem em hoje)
@@ -249,16 +288,7 @@ function JanelaConteudo({ conteudo, aoFechar }: { conteudo?: Conteudo; aoFechar:
           <label htmlFor="data">
             Data de estudo {data === hoje && <span className="secundario">(hoje)</span>}
           </label>
-          <input
-            id="data"
-            ref={dataRef}
-            type="date"
-            className="entrada"
-            value={data}
-            max={hoje}
-            onChange={(e) => setData(e.target.value)}
-            required
-          />
+          <SeletorData id="data" ref={dataRef} valor={data} max={hoje} hoje={hoje} aoMudar={setData} />
         </div>
 
         <div className="campo">
@@ -410,10 +440,75 @@ function JanelaDificil({
   );
 }
 
-function JanelaAnotacoes({ conteudo, numero, aoFechar }: { conteudo: Conteudo; numero: number; aoFechar: () => void }) {
-  const { disciplinaDe, abrir } = useApp();
+function Passo({
+  id,
+  rotulo,
+  valor,
+  min,
+  max,
+  aoMudar,
+}: {
+  id: string;
+  rotulo: string;
+  valor: number;
+  min: number;
+  max: number;
+  aoMudar: (v: number) => void;
+}) {
   return (
-    <Janela aoFechar={aoFechar} largura={500} rotulo="Anotações">
+    <div className="campo">
+      <label htmlFor={id}>{rotulo}</label>
+      <div className={styles.contador}>
+        <button
+          type="button"
+          className="botao botao-secundario"
+          onClick={() => aoMudar(Math.max(min, valor - (valor % 5 === 0 ? 5 : valor % 5)))}
+          aria-label={`Diminuir ${rotulo.toLowerCase()}`}
+          disabled={valor <= min}
+        >
+          <Minus size={16} />
+        </button>
+        <output id={id} className="entrada">
+          {valor} min
+        </output>
+        <button
+          type="button"
+          className="botao botao-secundario"
+          onClick={() => aoMudar(Math.min(max, valor + 5 - (valor % 5)))}
+          aria-label={`Aumentar ${rotulo.toLowerCase()}`}
+          disabled={valor >= max}
+        >
+          <Plus size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Janela da revisão: anotações, pomodoro e botão de concluir. */
+function JanelaRevisao({ revisaoId, conteudo, aoFechar }: { revisaoId: string; conteudo: Conteudo; aoFechar: () => void }) {
+  const { disciplinaDe, abrir, todasRevisoes, alternarRevisao, pomodoro, iniciarPomodoro, pararPomodoro } = useApp();
+  const agora = useAgora();
+  // A janela só abre depois de um clique, então já dá para ler os tempos guardados no navegador
+  const [tempos, setTempos] = useState(lerTempos);
+
+  const r = todasRevisoes.find((x) => x.id === revisaoId);
+  if (!r) return null;
+  const feita = Boolean(r.feita_em);
+  const meu = pomodoro?.revisaoId === r.id ? pomodoro : null;
+  const outro = pomodoro && !meu;
+
+  function mudar(t: typeof tempos) {
+    setTempos(t);
+    guardarTempos(t);
+  }
+
+  const restante = meu ? Math.max(0, meu.fimEm - agora) : 0;
+  const total = meu ? (meu.fase === "foco" ? meu.focoMin : meu.pausaMin) * 60_000 : 1;
+  const progresso = meu ? Math.min(100, Math.max(0, (1 - restante / total) * 100)) : 0;
+
+  return (
+    <Janela aoFechar={aoFechar} largura={520} rotulo="Revisão">
       <div className={styles.janelaTopo}>
         <span className={styles.janelaIcone}>
           <BookOpen size={20} />
@@ -421,24 +516,157 @@ function JanelaAnotacoes({ conteudo, numero, aoFechar }: { conteudo: Conteudo; n
         <div>
           <h2 className="titulo2">{conteudo.assunto}</h2>
           <p className="legenda secundario">
-            {disciplinaDe(conteudo)} · {nomeRevisao(numero)} · estudado em {dataCurta(conteudo.data_estudo)}
+            {disciplinaDe(conteudo)} · {nomeRevisao(r.numero)} · estudado em {dataCurta(conteudo.data_estudo)}
           </p>
         </div>
         <button type="button" className="botao-icone" onClick={aoFechar} aria-label="Fechar">
           <X size={20} />
         </button>
       </div>
+
       {conteudo.anotacoes ? (
         <p className={styles.anotacoes}>{conteudo.anotacoes}</p>
       ) : (
         <p className="corpo secundario">Sem anotações para este conteúdo.</p>
       )}
+
+      <div className={styles.pomodoro}>
+        <div className={styles.pomodoroTitulo}>
+          <span className="corpo-forte">
+            <Timer size={16} /> Pomodoro
+          </span>
+          {meu && (
+            <span className={`legenda ${meu.fase === "foco" ? styles.textoAviso : styles.textoFeita}`}>
+              {meu.fase === "foco" ? "Foco" : "Pausa"}
+            </span>
+          )}
+        </div>
+
+        {meu ? (
+          <>
+            <p className={styles.relogio} role="timer" aria-live="off">
+              {meu.terminou ? "00:00" : formatarRelogio(restante)}
+            </p>
+            <span className={styles.barra}>
+              <span style={{ width: `${meu.terminou ? 100 : progresso}%` }} />
+            </span>
+            <div className={styles.janelaBotoes}>
+              {meu.terminou ? (
+                <button type="button" className="botao botao-primario" onClick={() => abrir({ tipo: "pomodoroFim", revisao: r, conteudo })}>
+                  Responder
+                </button>
+              ) : (
+                <span />
+              )}
+              <button type="button" className="botao botao-secundario" onClick={pararPomodoro}>
+                <Square size={16} /> Parar
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={styles.configDois}>
+              <Passo id="foco" rotulo="Foco" valor={tempos.foco} min={FOCO_MIN} max={FOCO_MAX} aoMudar={(v) => mudar({ ...tempos, foco: v })} />
+              <Passo id="pausa" rotulo="Pausa" valor={tempos.pausa} min={PAUSA_MIN} max={PAUSA_MAX} aoMudar={(v) => mudar({ ...tempos, pausa: v })} />
+            </div>
+            {outro && <p className="legenda secundario">Você já tem um pomodoro rodando em outra revisão. Ao iniciar, ele será trocado por este.</p>}
+            <button
+              type="button"
+              className="botao botao-primario"
+              onClick={() => iniciarPomodoro(r, tempos.foco, tempos.pausa)}
+              disabled={feita}
+            >
+              <Play size={16} /> Iniciar pomodoro de {tempos.foco} min
+            </button>
+          </>
+        )}
+      </div>
+
       <div className={styles.janelaBotoes}>
         <button type="button" className="botao botao-secundario" onClick={() => abrir({ tipo: "conteudo", conteudo })}>
           <Pencil size={16} /> Editar
         </button>
-        <button type="button" className="botao botao-primario" onClick={aoFechar}>
-          Fechar
+        {r.numero === 1 ? (
+          <button type="button" className="botao botao-primario" onClick={aoFechar}>
+            Fechar
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={feita ? "botao botao-secundario" : "botao botao-primario"}
+            onClick={() => {
+              if (!feita && meu) pararPomodoro();
+              alternarRevisao(r);
+              if (!feita) aoFechar();
+            }}
+          >
+            <Check size={16} /> {feita ? "Concluída · desmarcar" : "Marcar como concluída"}
+          </button>
+        )}
+      </div>
+    </Janela>
+  );
+}
+
+/** Pergunta o que fazer quando o tempo do pomodoro acaba. */
+function JanelaPomodoroFim({ revisaoId, conteudo, aoFechar }: { revisaoId: string; conteudo: Conteudo; aoFechar: () => void }) {
+  const { disciplinaDe, todasRevisoes, alternarRevisao, pomodoro, pararPomodoro, proximaFasePomodoro } = useApp();
+  const r = todasRevisoes.find((x) => x.id === revisaoId);
+  if (!r || !pomodoro || pomodoro.revisaoId !== r.id) return null;
+  const foco = pomodoro.fase === "foco";
+
+  return (
+    <Janela aoFechar={aoFechar} largura={460} rotulo={foco ? "Tempo de foco acabou" : "Pausa acabou"}>
+      <div className={styles.centro}>
+        <span className={`${styles.janelaIcone} ${foco ? styles.iconeAviso : styles.iconeFeita}`}>
+          {foco ? <Timer size={22} /> : <Coffee size={22} />}
+        </span>
+        <h2 className="titulo2">{foco ? "Tempo de foco acabou!" : "A pausa acabou!"}</h2>
+        <span className={styles.etiqueta}>
+          {disciplinaDe(conteudo)} · {conteudo.assunto}
+        </span>
+        <p className="corpo secundario">
+          {foco ? `Você concluiu a ${nomeRevisao(r.numero)} deste conteúdo?` : "Pronto para outro bloco de foco?"}
+        </p>
+      </div>
+      <div className={styles.janelaBotoesColuna}>
+        {foco ? (
+          <>
+            <button
+              type="button"
+              className="botao botao-primario"
+              onClick={() => {
+                pararPomodoro();
+                if (!r.feita_em) alternarRevisao(r);
+                aoFechar();
+              }}
+            >
+              <Check size={18} /> Sim, concluí
+            </button>
+            {pomodoro.pausaMin > 0 ? (
+              <button type="button" className="botao botao-secundario" onClick={proximaFasePomodoro}>
+                <Coffee size={18} /> Ainda não, pausa de {pomodoro.pausaMin} min
+              </button>
+            ) : (
+              <button type="button" className="botao botao-secundario" onClick={proximaFasePomodoro}>
+                <Play size={18} /> Ainda não, mais {pomodoro.focoMin} min de foco
+              </button>
+            )}
+          </>
+        ) : (
+          <button type="button" className="botao botao-primario" onClick={proximaFasePomodoro}>
+            <Play size={18} /> Começar outro foco de {pomodoro.focoMin} min
+          </button>
+        )}
+        <button
+          type="button"
+          className="botao botao-secundario"
+          onClick={() => {
+            pararPomodoro();
+            aoFechar();
+          }}
+        >
+          Encerrar pomodoro
         </button>
       </div>
     </Janela>

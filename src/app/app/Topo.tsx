@@ -1,10 +1,11 @@
 "use client";
 
-import { LogOut, Moon, Settings, Sun } from "lucide-react";
+import { Coffee, LogOut, Moon, Settings, Sun, Timer } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Logo } from "@/components/Logo";
+import { formatarRelogio, useAgora, type Pomodoro } from "@/lib/pomodoro";
 import { aplicarTema, temaAtualEscuro } from "@/lib/tema";
 import { sair } from "../(entrar)/acoes";
 import { salvarTema } from "./acoes";
@@ -27,6 +28,31 @@ function observarTema(aoMudar: () => void) {
     obs.disconnect();
     midia.removeEventListener("change", aoMudar);
   };
+}
+
+/** Contagem do pomodoro sempre à vista; clicar abre a revisão. */
+function ChipPomodoro() {
+  const { pomodoro, todasRevisoes, conteudoDe, abrir } = useApp();
+  const r = pomodoro ? todasRevisoes.find((x) => x.id === pomodoro.revisaoId) : undefined;
+  if (!pomodoro || !r) return null;
+  return <ChipContando pomodoro={pomodoro} aoClicar={() => abrir({ tipo: pomodoro.terminou ? "pomodoroFim" : "revisao", revisao: r, conteudo: conteudoDe(r) })} assunto={conteudoDe(r).assunto} />;
+}
+
+function ChipContando({ pomodoro, assunto, aoClicar }: { pomodoro: Pomodoro; assunto: string; aoClicar: () => void }) {
+  const agora = useAgora();
+  const texto = pomodoro.terminou ? "Terminou!" : formatarRelogio(pomodoro.fimEm - agora);
+  return (
+    <button
+      type="button"
+      className={`${styles.chipPomodoro} ${pomodoro.fase === "pausa" ? styles.chipPausa : ""} ${pomodoro.terminou ? styles.chipTerminou : ""}`}
+      onClick={aoClicar}
+      title={`${pomodoro.fase === "foco" ? "Foco" : "Pausa"} · ${assunto}`}
+      aria-label={`Pomodoro: ${pomodoro.fase === "foco" ? "foco" : "pausa"}, ${texto}. Abrir revisão de ${assunto}`}
+    >
+      {pomodoro.fase === "foco" ? <Timer size={16} /> : <Coffee size={16} />}
+      <span>{texto}</span>
+    </button>
+  );
 }
 
 export function Topo() {
@@ -92,6 +118,7 @@ export function Topo() {
           ))}
         </nav>
         <div className={styles.topoAcoes}>
+          <ChipPomodoro />
           <button type="button" className={`botao-icone ${styles.soComputador}`} onClick={trocarTema} aria-label={escuro ? "Usar tema claro" : "Usar tema escuro"}>
             {escuro ? <Sun size={20} /> : <Moon size={20} />}
           </button>

@@ -33,7 +33,7 @@ export function ListaRevisoes({ revisoes, diaOriginal }: { revisoes: Revisao[]; 
             <button
               type="button"
               className={styles.itemTexto}
-              onClick={() => abrir({ tipo: "anotacoes", revisao: r, conteudo: c })}
+              onClick={() => abrir({ tipo: "revisao", revisao: r, conteudo: c })}
             >
               <span className={styles.assunto}>{c.assunto}</span>
               <span className="legenda secundario">

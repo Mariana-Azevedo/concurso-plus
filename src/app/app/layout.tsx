@@ -7,7 +7,7 @@ import { supabaseConfigurado } from "@/lib/supabase/config";
 import { Aviso } from "./Aviso";
 import { Carregando } from "./Carregando";
 import { ProvedorApp } from "./Contexto";
-import { Janelas } from "./Janelas";
+import { Janelas, MonitorPomodoro } from "./Janelas";
 import { Topo } from "./Topo";
 
 export const metadata: Metadata = {
@@ -35,6 +35,7 @@ async function AreaLogada({ children }: { children: React.ReactNode }) {
       <Topo />
       {children}
       <Janelas />
+      <MonitorPomodoro />
       <Aviso />
     </ProvedorApp>
   );

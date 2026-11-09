@@ -1,7 +1,15 @@
 "use client";
 
-import { createContext, startTransition, useContext, useMemo, useOptimistic, useState } from "react";
+import { createContext, startTransition, useContext, useEffect, useMemo, useOptimistic, useState } from "react";
 import type { Dados } from "@/lib/dados";
+import {
+  avisarNoNavegador,
+  guardarAndamento,
+  lerAndamento,
+  prepararAvisos,
+  tocarSom,
+  type Pomodoro,
+} from "@/lib/pomodoro";
 import { limiteRevisoesDia, type Conteudo, type Revisao } from "@/lib/revisoes";
 import { marcarRevisao } from "./acoes";
 
@@ -9,7 +17,8 @@ export type Janela =
   | { tipo: "conteudo"; conteudo?: Conteudo }
   | { tipo: "excluir"; conteudo: Conteudo }
   | { tipo: "dificil"; revisao: Revisao; conteudo: Conteudo }
-  | { tipo: "anotacoes"; revisao: Revisao; conteudo: Conteudo }
+  | { tipo: "revisao"; revisao: Revisao; conteudo: Conteudo }
+  | { tipo: "pomodoroFim"; revisao: Revisao; conteudo: Conteudo }
   | null;
 
 type Valor = Dados & {
@@ -22,6 +31,13 @@ type Valor = Dados & {
   abrir: (j: Janela) => void;
   fechar: () => void;
   alternarRevisao: (r: Revisao) => void;
+  pomodoro: Pomodoro | null;
+  iniciarPomodoro: (r: Revisao, focoMin: number, pausaMin: number) => void;
+  pararPomodoro: () => void;
+  /** Começa a pausa (depois do foco) ou um novo foco (depois da pausa). */
+  proximaFasePomodoro: () => void;
+  /** Chamado quando o tempo da fase acaba: toca o som e pergunta se concluiu. */
+  fimDaFasePomodoro: () => void;
   aviso: string | null;
   mostrarAviso: (texto: string) => void;
 };
@@ -39,6 +55,19 @@ type Mudanca = { id: string; feita_em: string | null };
 export function ProvedorApp({ dados, hoje, children }: { dados: Dados; hoje: string; children: React.ReactNode }) {
   const [janela, setJanela] = useState<Janela>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [pomodoro, setPomodoro] = useState<Pomodoro | null>(null);
+
+  // O pomodoro fica guardado no navegador e continua se a página recarregar
+  useEffect(() => {
+    // Lido só depois de montar, para o servidor e a tela começarem iguais
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPomodoro(lerAndamento());
+  }, []);
+
+  function definirPomodoro(p: Pomodoro | null) {
+    setPomodoro(p);
+    guardarAndamento(p);
+  }
 
   // Marcar como feita aparece na hora, antes de o servidor responder
   const [conteudos, aplicar] = useOptimistic(dados.conteudos, (atual: Conteudo[], m: Mudanca) =>
@@ -71,6 +100,49 @@ export function ProvedorApp({ dados, hoje, children }: { dados: Dados; hoje: str
       fechar: () => setJanela(null),
       aviso,
       mostrarAviso,
+      pomodoro,
+      iniciarPomodoro: (r, focoMin, pausaMin) => {
+        prepararAvisos();
+        definirPomodoro({
+          revisaoId: r.id,
+          fase: "foco",
+          fimEm: Date.now() + focoMin * 60_000,
+          focoMin,
+          pausaMin,
+          terminou: false,
+        });
+      },
+      pararPomodoro: () => definirPomodoro(null),
+      proximaFasePomodoro: () => {
+        if (!pomodoro) return;
+        const foco = pomodoro.fase === "pausa";
+        const minutos = foco ? pomodoro.focoMin : pomodoro.pausaMin;
+        definirPomodoro({
+          ...pomodoro,
+          fase: foco ? "foco" : "pausa",
+          fimEm: Date.now() + minutos * 60_000,
+          terminou: false,
+        });
+        setJanela(null);
+      },
+      fimDaFasePomodoro: () => {
+        if (!pomodoro || pomodoro.terminou) return;
+        definirPomodoro({ ...pomodoro, terminou: true });
+        tocarSom();
+        const c = conteudos.flatMap((x) => x.revisoes.map((r) => ({ r, c: x }))).find((x) => x.r.id === pomodoro.revisaoId);
+        avisarNoNavegador(
+          pomodoro.fase === "foco" ? "Tempo de foco acabou!" : "A pausa acabou!",
+          c ? c.c.assunto : "Concurso Plus",
+        );
+        // Não interrompe quem está digitando num formulário: nesse caso o aviso fica no topo
+        if (c) {
+          setJanela((j) =>
+            j && (j.tipo === "conteudo" || j.tipo === "excluir" || j.tipo === "dificil")
+              ? j
+              : { tipo: "pomodoroFim", revisao: c.r, conteudo: c.c },
+          );
+        }
+      },
       alternarRevisao: (r) => {
         const feita = !r.feita_em;
         startTransition(async () => {
@@ -88,7 +160,7 @@ export function ProvedorApp({ dados, hoje, children }: { dados: Dados; hoje: str
         });
       },
     };
-  }, [dados, conteudos, hoje, janela, aviso, aplicar]);
+  }, [dados, conteudos, hoje, janela, aviso, aplicar, pomodoro]);
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }

@@ -688,6 +688,70 @@
   overflow-wrap: anywhere;
 }
 
+/* Pomodoro */
+.pomodoro {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--fundo-suave);
+}
+.pomodoroTitulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pomodoroTitulo > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pomodoroTitulo > span:first-child svg {
+  color: var(--roxo);
+}
+.relogio {
+  text-align: center;
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.pomodoro .barra {
+  width: 100%;
+}
+.chipPomodoro {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--aviso-suave);
+  color: var(--aviso);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.chipPausa {
+  background: var(--feita-suave);
+  color: var(--feita);
+}
+.chipTerminou {
+  background: var(--atrasada-suave);
+  color: var(--atrasada);
+  animation: pulsar 1.2s ease-in-out infinite;
+}
+
+/* Barra de salvar das configurações */
+.barraSalvar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
 /* Aviso rápido */
 .aviso {
   position: fixed;

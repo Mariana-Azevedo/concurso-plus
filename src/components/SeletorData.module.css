@@ -1,0 +1,91 @@
+.caixa {
+  position: relative;
+}
+.gatilho {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.gatilho svg {
+  color: var(--roxo);
+  flex-shrink: 0;
+}
+.janela {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(340px, calc(100vw - 64px));
+  padding: 16px;
+  box-shadow: var(--sombra-janela);
+}
+.topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.topo .titulo3 {
+  text-transform: capitalize;
+}
+.topo button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.semana,
+.dias {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.semana {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--texto-secundario);
+}
+.dia {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.dia:hover:not(:disabled) {
+  background: var(--fundo-suave);
+}
+.dia:disabled {
+  color: var(--texto-secundario);
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.diaHoje {
+  color: var(--roxo);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px var(--roxo);
+}
+.diaEscolhido,
+.diaEscolhido:hover:not(:disabled) {
+  background: var(--roxo);
+  color: #fff;
+  font-weight: 600;
+}
+.atalho {
+  align-self: center;
+  margin-top: 4px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--roxo);
+  font-size: 13px;
+  font-weight: 600;
+}
+.atalho:hover {
+  background: var(--roxo-suave);
+}

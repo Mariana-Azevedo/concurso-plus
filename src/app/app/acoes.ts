@@ -168,14 +168,17 @@ export async function responderDificil(revisaoId: string, dificil: boolean): Pro
   const { supabase, usuarioId } = await sessao();
   const { data: r, error } = await supabase
     .from("revisoes")
-    .select("id, conteudo_id, numero, feita_em")
+    .select("id, conteudo_id, numero, data_prevista, feita_em")
     .eq("id", revisaoId)
     .single();
   if (error || !r) return { ok: false, erro: "Revisão não encontrada." };
 
   await supabase.from("revisoes").update({ achou_dificil: dificil }).eq("id", revisaoId);
   if (dificil) {
-    const base = r.feita_em ?? hojeISO();
+    // Conta a partir da data prevista da revisão, ou de quando foi feita, se for depois (revisão atrasada).
+    // Assim, marcar uma revisão antes do dia não encurta o intervalo.
+    const feita = r.feita_em ?? hojeISO();
+    const base = feita > r.data_prevista ? feita : r.data_prevista;
     const { error: e } = await supabase.from("revisoes").upsert(
       {
         usuario_id: usuarioId,
